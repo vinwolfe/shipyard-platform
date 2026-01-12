@@ -34,13 +34,7 @@ lint:
 check: fmt lint test
 
 smoke:
-	@echo "Smoke test: /healthz"
-	curl -i http://localhost:$(SERVICE_PORT)/healthz
-	@echo ""
-	@echo ""
-	@echo "Smoke test: /readyz"
-	curl -i http://localhost:$(SERVICE_PORT)/readyz
-	@echo ""
-	@echo ""
+	@chmod +x scripts/smoke.sh
+	@SERVICE_PORT=$(SERVICE_PORT) scripts/smoke.sh
 
 ci: check
