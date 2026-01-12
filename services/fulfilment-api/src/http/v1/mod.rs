@@ -16,5 +16,5 @@ mod orders;
 /// Design notes:
 /// - Nest resources under a clear namespace (`/orders`, `/customers`, etc.).
 pub fn router() -> Router {
-    Router::new()
+    Router::new().nest("/orders", orders::router())
 }

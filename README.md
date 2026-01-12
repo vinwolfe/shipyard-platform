@@ -37,11 +37,16 @@ Every request should produce **three signals**:
 
 ```
 shipyard-platform/
-  services/                # “ships”
+  docs/architecture/                 # ADRs and design notes
+  services/                          # “ships”
     fulfilment-api/
-  docs/
-    architecture/          # ADRs and design notes
-  Makefile                 # golden path commands
+      src/
+        main.rs                      # runtime boot
+        lib.rs                       # app assembly seam
+        http/router.rs               # routes + /api/v1
+        http/v1/orders.rs            # POST /orders/validate
+      tests/                         # integration tests
+  Makefile                           # golden path commands
 ```
 
 ---
