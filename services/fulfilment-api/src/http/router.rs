@@ -6,10 +6,8 @@
 //! - Encourages a consistent routing shape as the service grows.
 //!
 //! TODO: Apply service-wide fallback (404) mapping once a standard error model exists.
-
-use axum::{Router, routing::get};
-
-use crate::http::v1;
+use crate::http::{middleware::request_id, v1};
+use axum::{Router, middleware::from_fn, routing::get};
 
 /// Build the service router.
 ///
@@ -21,4 +19,5 @@ pub fn build_router() -> Router {
         .route("/healthz", get(|| async { "ok" }))
         .route("/readyz", get(|| async { "ready" }))
         .nest("/api/v1", v1::router())
+        .layer(from_fn(request_id::middleware))
 }
