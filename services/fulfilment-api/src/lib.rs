@@ -16,7 +16,6 @@ use axum::Router;
 /// - Stable seam for tests (`tests/*`) and the binary (`main.rs`).
 /// - Central place to compose middleware/layers as the service grows.
 ///
-/// TODO: Apply request_id and consistent error mapping globally.
 /// TODO: Apply tracing + metrics layers once observability is introduced.
 pub fn build_app() -> Router {
     crate::http::router::build_router()
