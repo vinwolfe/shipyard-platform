@@ -18,6 +18,12 @@ impl RequestId {
     }
 }
 
+impl Default for RequestId {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 /// Middleware: ensure every request has a request_id and every response returns it.
 ///
 /// Behaviour:
