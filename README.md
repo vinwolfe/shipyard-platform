@@ -37,7 +37,9 @@ Every request should produce **three signals**:
 
 ```
 shipyard-platform/
-  docs/architecture/                 # ADRs and design notes
+  docs/
+    api/                             # API contracts and conventions
+    architecture/                    # ADRs and design notes
   services/                          # “ships”
     fulfilment-api/
       src/
@@ -50,7 +52,6 @@ shipyard-platform/
 ```
 
 ---
-
 
 ## Quickstart
 
