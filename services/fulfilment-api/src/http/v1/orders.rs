@@ -4,11 +4,10 @@
 //! - Early on, colocating routes + DTOs + handler keeps the change surface small.
 //! - We extract shared utilities only when justified by reuse (thin platform principle).
 //!
-//! TODO: Replace temporary error responses with the service-wide error model.
 //! TODO: Move stable cross-cutting helpers (once proven) into shared HTTP utilities.
-use axum::{Json, Router, http::StatusCode, routing::post};
+use crate::http::{error::ApiError, middleware::RequestId};
+use axum::{Extension, Json, Router, routing::post};
 use serde::{Deserialize, Serialize};
-use serde_json::json;
 
 /// Orders router.
 pub fn router() -> Router {
@@ -46,24 +45,34 @@ pub struct NormalizedOrder {
 
 /// Handler for validating an order payload.
 async fn validate_order(
+    Extension(req_id): Extension<RequestId>,
     Json(req): Json<ValidateOrderRequest>,
-) -> Result<Json<ValidateOrderResponse>, (StatusCode, Json<serde_json::Value>)> {
+) -> Result<Json<ValidateOrderResponse>, ApiError> {
     // Deterministic validation rules (simple + explicit)
     //
     // TODO: If validation rules become complex or widely reused, introduce a validation approach
     // that remains explicit and testable (avoid magic-heavy frameworks).
     if req.external_id.trim().is_empty() {
-        return Err(bad_request("external_id must not be empty"));
+        return Err(ApiError::validation(
+            &req_id,
+            "external_id must not be empty",
+        ));
     }
     if req.items.is_empty() {
-        return Err(bad_request("items must not be empty"));
+        return Err(ApiError::validation(&req_id, "items must not be empty"));
     }
     for (idx, item) in req.items.iter().enumerate() {
         if item.sku.trim().is_empty() {
-            return Err(bad_request(&format!("items[{idx}].sku must not be empty")));
+            return Err(ApiError::validation(
+                &req_id,
+                format!("items[{idx}].sku must not be empty"),
+            ));
         }
         if item.qty <= 0 {
-            return Err(bad_request(&format!("items[{idx}].qty must be > 0")));
+            return Err(ApiError::validation(
+                &req_id,
+                format!("items[{idx}].qty must be > 0"),
+            ));
         }
     }
 
@@ -80,21 +89,4 @@ async fn validate_order(
     };
 
     Ok(Json(resp))
-}
-
-/// Temporary error helper.
-///
-/// TODO: Replace this with the service-wide error model.
-/// TODO: Include `request_id` in error bodies and set `x-request-id` on all responses.
-/// TODO: Add structured error `code` and optional `details` fields.
-fn bad_request(message: &str) -> (StatusCode, Json<serde_json::Value>) {
-    // Temporary shape for WIG-6; WIG-7 will standardise this.
-    (
-        StatusCode::BAD_REQUEST,
-        Json(json!({
-            "error": {
-                "message": message
-            }
-        })),
-    )
 }
