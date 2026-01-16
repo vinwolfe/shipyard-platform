@@ -1,24 +1,21 @@
-//! Service library entrypoint.
+//! Service composition seam.
 //!
-//! Why this exists:
-//! - `main.rs` should be thin (runtime boot only).
-//! - Tests can build the app without starting a real server.
-//! - Cross-cutting concerns will be applied here over time.
-//!
-//! TODO: Attach global middleware/layers (request_id, tracing, metrics) at this seam.
-//! TODO: Wire app state here (config, DB pool) once introduced.
+//! `main.rs` should be thin (runtime boot only). This module provides a stable
+//! `build_app` entrypoint for both the binary and integration tests.
 
 use axum::Router;
-
-/// Build the Axum application router.
-///
-/// Why this is a function:
-/// - Stable seam for tests (`tests/*`) and the binary (`main.rs`).
-/// - Central place to compose middleware/layers as the service grows.
-///
-/// TODO: Apply tracing + metrics layers once observability is introduced.
-pub fn build_app() -> Router {
-    crate::http::router::build_router()
-}
+use shipyard_config::AppConfig;
 
 pub mod http;
+
+#[derive(Clone)]
+pub struct AppState {
+    pub config: AppConfig,
+}
+
+/// Build the Axum application router with attached state.
+///
+/// TODO: Attach tracing + metrics layers at this seam once observability is introduced.
+pub fn build_app(config: AppConfig) -> Router {
+    http::router::build_router().with_state(AppState { config })
+}
