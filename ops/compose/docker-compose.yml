@@ -1,0 +1,50 @@
+services:
+  fulfilment-api:
+    build:
+      context: ../..
+      dockerfile: services/fulfilment-api/Dockerfile
+    container_name: fulfilment-api
+    environment:
+      - SERVICE_PORT=8080
+    ports:
+      - "8080:8080"
+    depends_on:
+      - otelcol
+    networks:
+      - shipyard
+  jaeger:
+    image: jaegertracing/all-in-one:1.57
+    container_name: jaeger
+    ports:
+      - "16686:16686" # UI
+      # - "4317:4317" # OTLP gRPC (optional; we export to otelcol)
+    networks:
+      - shipyard
+
+  prometheus:
+    image: prom/prometheus:v2.54.1
+    container_name: prometheus
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml:ro
+    networks:
+      - shipyard
+
+  otelcol:
+    image: otel/opentelemetry-collector-contrib:0.110.0
+    container_name: otelcol
+    command: [ "--config=/etc/otelcol/config.yaml" ]
+    volumes:
+      - ./otel-collector-config.yaml:/etc/otelcol/config.yaml:ro
+    ports:
+      - "${OTELCOL_OTLP_GRPC_PORT:-14317}:4317" # OTLP gRPC ingest
+      - "${OTELCOL_OTLP_HTTP_PORT:-14318}:4318" # OTLP HTTP ingest (optional)
+    depends_on:
+      - jaeger
+    networks:
+      - shipyard
+
+networks:
+  shipyard:
+    name: shipyard
