@@ -39,16 +39,21 @@ Every request should produce **three signals**:
 shipyard-platform/
   docs/
     api/                             # API contracts and conventions
+    runbooks/                        # Operational guides (golden paths, drills)
     architecture/                    # ADRs and design notes
+  ops/
+    compose/                         # Local runtime stack (docker compose + configs)
+  scripts/                           # Local helper scripts used by Make targets
   services/                          # “ships”
     fulfilment-api/
       src/
-        main.rs                      # runtime boot
-        lib.rs                       # app assembly seam
-        http/router.rs               # routes + /api/v1
+        main.rs                      # Runtime boot
+        lib.rs                       # App assembly seam
+        http/router.rs               # Routes + /api/v1
         http/v1/orders.rs            # POST /orders/validate
-      tests/                         # integration tests
-  Makefile                           # golden path commands
+      tests/                         # Integration tests
+      Dockerfile 
+  Makefile                           # Golden path commands
 ```
 
 ---
@@ -57,6 +62,7 @@ shipyard-platform/
 
 ### Prerequisites
 - Rust toolchain (stable)
+- Docker + Docker Compose (for `make up` local runtime)
 
 ### Run the service directly
 ```zsh
@@ -65,6 +71,10 @@ make dev
 
 Service listens on: `http://localhost:8080`
 
+### Run the full local runtime (Compose)
+```zsh
+make up
+```
 ### Verify endpoints
 ```zsh
 make smoke
@@ -91,6 +101,13 @@ make lint
 ```zsh
 make check
 ```
+
+---
+
+## Docs
+- API conventions: [docs/api/conventions.md](docs/api/conventions.md)
+- Local runtime runbook: [docs/runbooks/local-runtime.md](docs/runbooks/local-runtime.md)
+- Architecture decisions (ADRs): [docs/architecture/](docs/architecture/)
 
 ---
 
