@@ -2,5 +2,6 @@
 resolver = "3"
 members = [
   "crates/shipyard-config",
+  "crates/shipyard-web",
   "services/fulfilment-api",
 ]

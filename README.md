@@ -39,6 +39,7 @@ Every request should produce **three signals**:
 shipyard-platform/
   crates/                            # Shared “harbour equipment” crates
     shipyard-config/                 # Runtime configuration contract (env-only, typed, fail-fast)
+    shipyard-web/                    # HTTP contract pack (request_id, ApiError, web contract)
   docs/
     api/                             # API contracts and conventions
     runbooks/                        # Operational guides (golden paths, drills)
