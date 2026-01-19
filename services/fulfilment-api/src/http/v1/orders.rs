@@ -2,9 +2,9 @@
 
 use axum::{Extension, Json, Router, routing::post};
 use serde::{Deserialize, Serialize};
+use shipyard_web::{ApiError, RequestId};
 
 use crate::AppState;
-use crate::http::{error::ApiError, middleware::RequestId};
 
 pub fn router() -> Router<AppState> {
     Router::new().route("/validate", post(validate_order))

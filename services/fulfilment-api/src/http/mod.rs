@@ -6,7 +6,5 @@
 //!
 //! TODO: Introduce shared HTTP utilities (error mapping, middleware) when they emerge as stable contracts.
 
-pub mod error;
-pub mod middleware;
 pub mod router;
 pub mod v1;
