@@ -65,17 +65,33 @@ async fn unknown_route_returns_json_404_with_request_id() {
         .expect("oneshot");
 
     assert_eq!(res.status(), StatusCode::NOT_FOUND);
-    assert!(!header_str(&res, "x-request-id").trim().is_empty());
+    let header_id = header_str(&res, "x-request-id").to_string();
+    assert!(!header_id.trim().is_empty());
 
     let v = json_body(res).await;
     assert_eq!(v["error"]["code"], "NOT_FOUND");
-    assert!(
-        !v["error"]["request_id"]
-            .as_str()
-            .expect("error.request_id is string")
-            .trim()
-            .is_empty()
-    );
+
+    let body_id = v["error"]["request_id"]
+        .as_str()
+        .expect("error.request_id is string")
+        .to_string();
+
+    assert!(!body_id.trim().is_empty());
+    assert_eq!(body_id, header_id);
+}
+
+#[tokio::test]
+async fn fallback_reuses_inbound_x_request_id() {
+    let res = app()
+        .oneshot(req("/does-not-exist", Some("fixed-id-404")))
+        .await
+        .expect("oneshot");
+
+    assert_eq!(res.status(), StatusCode::NOT_FOUND);
+    assert_eq!(header_str(&res, "x-request-id"), "fixed-id-404");
+
+    let v = json_body(res).await;
+    assert_eq!(v["error"]["request_id"], "fixed-id-404");
 }
 
 #[tokio::test]
