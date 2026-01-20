@@ -1,5 +1,7 @@
 //! Top-level router wiring (runtime endpoints + versioned API).
 
+use axum::http::header;
+use axum::response::IntoResponse;
 use axum::{Router, routing::get};
 
 use crate::AppState;
@@ -10,6 +12,14 @@ pub fn build_router() -> Router<AppState> {
         Router::new()
             .route("/healthz", get(|| async { "ok" }))
             .route("/readyz", get(|| async { "ready" }))
+            .route("/metrics", get(metrics_stub))
             .nest("/api/v1", v1::router()),
+    )
+}
+
+async fn metrics_stub() -> impl IntoResponse {
+    (
+        [(header::CONTENT_TYPE, "text/plain; version=0.0.4")],
+        "# TODO: Prometheus metrics\n",
     )
 }
