@@ -1,0 +1,12 @@
+[package]
+name = "shipyard-observability"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+opentelemetry = "0.23"
+opentelemetry-otlp = { version = "0.16", features = ["grpc-tonic"] }
+opentelemetry_sdk = { version = "0.23", features = ["rt-tokio"] }
+tracing = "0.1"
+tracing-opentelemetry = "0.24"
+tracing-subscriber = { version = "0.3", features = ["json", "env-filter"] }
