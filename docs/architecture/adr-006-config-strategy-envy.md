@@ -8,12 +8,6 @@
 ## Context
 Shipyard aims to provide a repeatable “golden path” for building and operating services with clear runtime contracts. Configuration is a foundational contract: if it is inconsistent, implicit, or permissive, services become harder to deploy, debug, and operate.
 
-Constraints and forces:
-- Time budget: 5h/week → keep config simple and low-maintenance.
-- Golden paths: one paved way to configure and validate.
-- Portability: local compose now, cloud adapters later → configuration should work across targets without refactors.
-- Fail fast: misconfiguration should surface immediately at startup, not as undefined runtime behaviour.
-
 ## Decision
 - Chosen option: Env-only configuration using `envy` + `serde`, with explicit validation and fail-fast startup.
 - Summary:
