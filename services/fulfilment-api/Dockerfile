@@ -1,17 +1,15 @@
+# NOTE: This Dockerfile intentionally uses `COPY . .` for reliability in early loops.
+# When Docker build times become painful, switch to a workspace-safe caching strategy
+# using cargo-chef
+
 # --- Build stage ---
-FROM rustlang/rust:nightly-bookworm AS builder
+FROM rust:bookworm AS builder
 WORKDIR /app
 
-# Cache deps
-COPY Cargo.toml Cargo.lock ./
-COPY services/fulfilment-api/Cargo.toml services/fulfilment-api/Cargo.toml
-RUN mkdir -p services/fulfilment-api/src && \
-    echo "fn main() {}" > services/fulfilment-api/src/main.rs && \
-    cargo build -p fulfilment-api --release && \
-    rm -rf services/fulfilment-api/src
+# Copy full workspace (simple + reliable for early project)
+COPY . .
 
 # Build real binary
-COPY services/fulfilment-api services/fulfilment-api
 RUN cargo build -p fulfilment-api --release
 
 # --- Runtime stage ---
