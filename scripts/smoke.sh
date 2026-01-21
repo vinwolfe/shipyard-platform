@@ -127,6 +127,7 @@ echo "${BLUE}==> Smoke test base URL: ${BASE_URL}${NC}"
 echo
 hit_get "/healthz" "/healthz"
 hit_get "/readyz"  "/readyz"
+hit_get "/metrics" "/metrics" 15
 
 hit_get "GET /does-not-exist (expect 404 JSON error)" "/does-not-exist" \
   25 \
