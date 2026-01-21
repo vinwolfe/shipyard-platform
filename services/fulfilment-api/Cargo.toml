@@ -4,14 +4,25 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
+# Harbour crates
 shipyard-config = { path = "../../crates/shipyard-config" }
 shipyard-observability = { path = "../../crates/shipyard-observability" }
 shipyard-web = { path = "../../crates/shipyard-web" }
+
+# Runtime + HTTP
 axum = "0.7"
 tokio = { version = "1", features = ["macros", "rt-multi-thread", "signal"] }
+
+# Serialisation
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
+
+# Logging/tracing
 tracing = "0.1"
+
+# Metrics
+once_cell = "1"
+prometheus-client = "0.22"
 
 [dev-dependencies]
 tower = "0.5"
