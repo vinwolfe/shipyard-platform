@@ -111,6 +111,8 @@ make check
 ## Docs
 - API conventions: [docs/api/conventions.md](docs/api/conventions.md)
 - Local runtime runbook: [docs/runbooks/local-runtime.md](docs/runbooks/local-runtime.md)
+- Observability runbook: [docs/runbooks/observability-local.md](docs/runbooks/observability-local.md)
+- Metrics runbook: [docs/runbooks/metrics-local.md](docs/runbooks/metrics-local.md)
 - Architecture decisions (ADRs): [docs/architecture/](docs/architecture/)
 
 ---
@@ -120,7 +122,7 @@ make check
 ### Loop 1 — Foundations
 - Service skeleton + health/readiness + validation endpoint
 - Local observability runtime (OTel Collector + Jaeger + Prometheus)
-- Correlated JSON logs (trace_id, span_id, request_id)
+- JSON logs (request-scoped) include a `request.completed` event with trace_id, span_id, request_id
 
 ### Loop 2 — Data + correctness under failure
 - Postgres + migrations
