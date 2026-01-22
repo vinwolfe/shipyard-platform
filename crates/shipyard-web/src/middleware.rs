@@ -31,7 +31,7 @@ impl Default for RequestId {
 /// - Otherwise generate a UUIDv4.
 /// - Always set `x-request-id` on the response.
 ///
-/// TODO: Add propagation into logs/traces once observability is introduced.
+/// Note: request_id is logged and correlated with trace/span ids by request_log_middleware.
 pub async fn request_id_middleware(mut req: Request, next: Next) -> Response {
     let req_id = req
         .headers()

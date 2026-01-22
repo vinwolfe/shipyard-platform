@@ -3,6 +3,7 @@
 use axum::{Extension, Json, Router, routing::post};
 use serde::{Deserialize, Serialize};
 use shipyard_web::{ApiError, RequestId};
+use tracing::instrument;
 
 use crate::AppState;
 
@@ -34,6 +35,11 @@ pub struct NormalizedOrder {
     pub total_qty: i32,
 }
 
+#[instrument(
+    name = "orders.validate",
+    skip(req, req_id),
+    fields(request_id = %req_id.0, external_id = %req.external_id)
+)]
 async fn validate_order(
     Extension(req_id): Extension<RequestId>,
     Json(req): Json<ValidateOrderRequest>,
