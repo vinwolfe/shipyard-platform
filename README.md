@@ -4,6 +4,7 @@
 >
 > **Stack:** Rust + Axum (monorepo)
 
+![CI](https://github.com/vinwolfe/shipyard-platform/actions/workflows/ci.yml/badge.svg)
 ---
 
 ## Why Shipyard exists

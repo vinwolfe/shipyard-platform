@@ -24,10 +24,10 @@ help:
 	@echo "  make build         - build the workspace"
 	@echo "  make test          - run tests for the workspace"
 	@echo "  make fmt           - format code (cargo fmt)"
+	@echo "  make fmt-check     - check code format (cargo fmt --check)"
 	@echo "  make lint          - lint code (cargo clippy, denies warnings)"
 	@echo "  make check         - fmt + lint + test"
 	@echo "  make smoke         - smoke checks (service must be running)"
-	@echo "  make ci            - alias for check (used by CI)"
 	@echo ""
 	@echo "Runtime (docker compose):"
 	@echo "  make up            - start runtime stack (build + up -d)"
@@ -41,7 +41,7 @@ help:
 # =========================
 # Dev (local cargo)
 # =========================
-.PHONY: dev build test fmt lint check smoke ci
+.PHONY: dev build test fmt fmt-check lint check smoke
 dev:
 	cargo run -p $(SERVICE)
 
@@ -54,16 +54,17 @@ test:
 fmt:
 	cargo fmt --all
 
+fmt-check:
+	cargo fmt --all --check
+
 lint:
 	cargo clippy --workspace --all-targets --all-features -- -D warnings
 
-check: fmt lint test
+check: fmt-check lint test
 
 smoke:
 	@chmod +x scripts/smoke.sh
 	@SERVICE_PORT=$(SERVICE_PORT) scripts/smoke.sh
-
-ci: check
 
 # =========================
 # Runtime (docker compose)
