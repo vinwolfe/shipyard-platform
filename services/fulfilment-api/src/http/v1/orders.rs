@@ -1,13 +1,27 @@
 //! Orders routes for API v1.
-
-use axum::{Extension, Json, Router, routing::post};
+use axum::{
+    Extension, Json, Router,
+    extract::{Path, State},
+    http::StatusCode,
+    routing::{get, post},
+};
 use serde::{Deserialize, Serialize};
-use shipyard_web::{ApiError, RequestId};
+use sqlx::FromRow;
 use tracing::instrument;
+
+use shipyard_config::AppConfig;
+use shipyard_web::{ApiError, RequestId};
 
 use crate::AppState;
 
 pub fn router() -> Router<AppState> {
+    Router::new()
+        .route("/validate", post(validate_order))
+        .route("/", post(create_order))
+        .route("/:id", get(get_order))
+}
+
+pub fn router_no_db() -> Router<AppConfig> {
     Router::new().route("/validate", post(validate_order))
 }
 
@@ -35,6 +49,40 @@ pub struct NormalizedOrder {
     pub total_qty: i32,
 }
 
+// ===== Persistence DTOs =====
+
+#[derive(Debug, Deserialize)]
+pub struct CreateOrderRequest {
+    pub external_id: String,
+    pub items: Vec<OrderItem>,
+}
+
+#[derive(Debug, Serialize)]
+pub struct CreateOrderResponse {
+    pub id: String,
+    pub external_id: String,
+    pub item_count: i32,
+    pub total_qty: i32,
+}
+
+#[derive(Debug, Serialize)]
+pub struct GetOrderResponse {
+    pub id: String,
+    pub external_id: String,
+    pub item_count: i32,
+    pub total_qty: i32,
+}
+
+#[derive(Debug, FromRow)]
+struct OrderRow {
+    id: sqlx::types::Uuid,
+    external_id: String,
+    item_count: i32,
+    total_qty: i32,
+}
+
+// ===== Handlers =====
+
 #[instrument(
     name = "orders.validate",
     skip(req, req_id),
@@ -57,6 +105,88 @@ async fn validate_order(
         },
     }))
 }
+
+#[instrument(
+    name = "orders.create",
+    skip(state, req),
+    fields(request_id = %req_id.0, external_id = %req.external_id)
+)]
+async fn create_order(
+    State(state): State<AppState>,
+    Extension(req_id): Extension<RequestId>,
+    Json(req): Json<CreateOrderRequest>,
+) -> Result<(StatusCode, Json<CreateOrderResponse>), ApiError> {
+    validate_create(&req, &req_id)?;
+
+    let item_count: i32 = req.items.len() as i32;
+    let total_qty: i32 = req.items.iter().map(|i| i.qty).sum();
+
+    let id = sqlx::types::Uuid::new_v4();
+
+    let row: OrderRow = sqlx::query_as(
+        r#"
+        INSERT INTO orders (id, external_id, item_count, total_qty)
+        VALUES ($1, $2, $3, $4)
+        RETURNING id, external_id, item_count, total_qty
+        "#,
+    )
+    .bind(id)
+    .bind(&req.external_id)
+    .bind(item_count)
+    .bind(total_qty)
+    .fetch_one(&state.db)
+    .await
+    .map_err(|e| map_db_error(&req_id, e))?;
+
+    Ok((
+        StatusCode::CREATED,
+        Json(CreateOrderResponse {
+            id: row.id.to_string(),
+            external_id: row.external_id,
+            item_count: row.item_count,
+            total_qty: row.total_qty,
+        }),
+    ))
+}
+
+#[instrument(
+    name = "orders.get",
+    skip(state),
+    fields(request_id = %req_id.0, order_id = %id)
+)]
+async fn get_order(
+    State(state): State<AppState>,
+    Extension(req_id): Extension<RequestId>,
+    Path(id): Path<String>,
+) -> Result<Json<GetOrderResponse>, ApiError> {
+    let id = sqlx::types::Uuid::parse_str(&id)
+        .map_err(|_| ApiError::validation(&req_id, "invalid id (expected UUID)"))?;
+
+    let row: Option<OrderRow> = sqlx::query_as(
+        r#"
+        SELECT id, external_id, item_count, total_qty
+        FROM orders
+        WHERE id = $1
+        "#,
+    )
+    .bind(id)
+    .fetch_optional(&state.db)
+    .await
+    .map_err(|e| map_db_error(&req_id, e))?;
+
+    let Some(row) = row else {
+        return Err(ApiError::not_found(&req_id));
+    };
+
+    Ok(Json(GetOrderResponse {
+        id: row.id.to_string(),
+        external_id: row.external_id,
+        item_count: row.item_count,
+        total_qty: row.total_qty,
+    }))
+}
+
+// ===== Helpers =====
 
 fn validate(req: &ValidateOrderRequest, req_id: &RequestId) -> Result<(), ApiError> {
     if req.external_id.trim().is_empty() {
@@ -85,4 +215,45 @@ fn validate(req: &ValidateOrderRequest, req_id: &RequestId) -> Result<(), ApiErr
     }
 
     Ok(())
+}
+
+fn validate_create(req: &CreateOrderRequest, req_id: &RequestId) -> Result<(), ApiError> {
+    if req.external_id.trim().is_empty() {
+        return Err(ApiError::validation(
+            req_id,
+            "external_id must not be empty",
+        ));
+    }
+    if req.items.is_empty() {
+        return Err(ApiError::validation(req_id, "items must not be empty"));
+    }
+    for (idx, item) in req.items.iter().enumerate() {
+        if item.sku.trim().is_empty() {
+            return Err(ApiError::validation(
+                req_id,
+                format!("items[{idx}].sku must not be empty"),
+            ));
+        }
+        if item.qty <= 0 {
+            return Err(ApiError::validation(
+                req_id,
+                format!("items[{idx}].qty must be > 0"),
+            ));
+        }
+    }
+    Ok(())
+}
+
+fn map_db_error(req_id: &RequestId, err: sqlx::Error) -> ApiError {
+    // log for operators (don't leak details to clients)
+    tracing::error!(error = %err, "db error");
+
+    if let sqlx::Error::Database(db_err) = &err {
+        // postgres unique_violation
+        if db_err.code().as_deref() == Some("23505") {
+            return ApiError::conflict(req_id, "external_id already exists");
+        }
+    }
+
+    ApiError::internal(req_id)
 }

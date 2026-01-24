@@ -4,13 +4,23 @@ SHELL := /bin/bash
 # Config
 # =========================
 SERVICE ?= fulfilment-api
+SERVICE_BIN ?= fulfilment-api
 SERVICE_PORT ?= 8080
 
 COMPOSE_DIR := ops/compose
 COMPOSE_FILE := $(COMPOSE_DIR)/docker-compose.yml
 COMPOSE := docker compose -f $(COMPOSE_FILE)
 
+DB_SVC ?= postgres
+DATABASE_URL ?= postgres://shipyard:shipyard@localhost:5432/shipyard
+
 LOG_TAIL ?= 200
+
+ENV_FILE ?= .env
+
+define LOAD_ENV
+set -a; [ -f $(ENV_FILE) ] && . $(ENV_FILE); set +a;
+endef
 
 # =========================
 # Help
@@ -28,22 +38,34 @@ help:
 	@echo "  make lint          - lint code (cargo clippy, denies warnings)"
 	@echo "  make check         - fmt + lint + test"
 	@echo "  make smoke         - smoke checks (service must be running)"
+	@echo "  make env-check     - print key env vars as seen by Make"
 	@echo ""
 	@echo "Runtime (docker compose):"
 	@echo "  make up            - start runtime stack (build + up -d)"
 	@echo "  make down          - stop runtime stack"
 	@echo "  make restart       - restart runtime stack"
-	@echo "  make restart-full  - restart runtime stack (down + up)"
 	@echo "  make logs          - tail all runtime logs"
 	@echo "  make logs-service  - tail one service logs (SVC=jaeger|otelcol|prometheus|fulfilment-api)"
+	@echo ""
+	@echo "DB (workflow):"
+	@echo "  make dev-db-up     - start Postgres only (compose profile db)"
+	@echo "  make dev-db-down   - stop Postgres only (compose profile db)"
+	@echo "  make migrate       - apply $(SERVICE) migrations"
+	@echo "  make test-db       - run DB integration tests (auto starts/stops Postgres)"
+	@echo "  make db-logs       - tail Postgres logs"
 	@echo ""
 
 # =========================
 # Dev (local cargo)
 # =========================
-.PHONY: dev build test fmt fmt-check lint check smoke
+.PHONY: dev build test fmt fmt-check lint check smoke env-check
 dev:
-	cargo run -p $(SERVICE)
+	@bash -lc '$(LOAD_ENV) \
+	if [ -z "$${DATABASE_URL:-}" ]; then \
+		echo "ERROR: DATABASE_URL not set. Put it in $(ENV_FILE) (recommended) or export it."; \
+		exit 1; \
+	fi; \
+	cargo run -p $(SERVICE) --bin $(SERVICE_BIN)'
 
 build:
 	cargo build --workspace
@@ -66,21 +88,20 @@ smoke:
 	@chmod +x scripts/smoke.sh
 	@SERVICE_PORT=$(SERVICE_PORT) scripts/smoke.sh
 
+env-check:
+	@bash -lc '$(LOAD_ENV) env | grep -E "^DATABASE_URL$|^SERVICE_PORT$"'
+
 # =========================
 # Runtime (docker compose)
 # =========================
 .PHONY: up down restart logs logs-service
-
 up:
 	$(COMPOSE) up -d --build
 
 down:
 	$(COMPOSE) down
 
-restart:
-	$(COMPOSE) restart
-
-restart-full: down up
+restart: down up
 
 logs:
 	$(COMPOSE) logs -f --tail=$(LOG_TAIL)
@@ -88,3 +109,39 @@ logs:
 logs-service:
 	@test -n "$(SVC)" || (echo "Usage: make logs-service SVC=<service>"; exit 1)
 	$(COMPOSE) logs -f --tail=$(LOG_TAIL) $(SVC)
+
+# =========================
+# DB (workflow)
+# =========================
+.PHONY: dev-db-up dev-db-wait dev-db-down db-logs migrate test-db
+
+dev-db-up:
+	$(COMPOSE) --profile db up -d $(DB_SVC)
+
+dev-db-wait:
+	@echo "Waiting for Postgres healthcheck..."
+	@cid="$$( $(COMPOSE) --profile db ps -q $(DB_SVC) )"; \
+	until [ "$$(docker inspect -f '{{.State.Health.Status}}' $$cid 2>/dev/null)" = "healthy" ]; do \
+		sleep 1; \
+	done; \
+	echo "Postgres is healthy."
+
+dev-db-down:
+	$(COMPOSE) --profile db rm -sf $(DB_SVC) >/dev/null || true
+
+db-logs:
+	$(COMPOSE) --profile db logs -f --tail=$(LOG_TAIL) $(DB_SVC)
+
+migrate: dev-db-up dev-db-wait
+	@bash -lc '$(LOAD_ENV) \
+		DATABASE_URL=$${DATABASE_URL:-$(DATABASE_URL)} \
+		cargo run -p $(SERVICE) --bin migrate'
+
+test-db:
+	@set -e; \
+	$(MAKE) dev-db-up; \
+	$(MAKE) dev-db-wait; \
+	trap '$(MAKE) dev-db-down' EXIT; \
+	bash -lc '$(LOAD_ENV) \
+		DATABASE_URL=$${DATABASE_URL:-$(DATABASE_URL)} \
+		cargo test -p $(SERVICE) db_ -- --ignored'

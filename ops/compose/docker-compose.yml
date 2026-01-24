@@ -9,12 +9,35 @@ services:
       - OTEL_SERVICE_NAME=fulfilment-api
       - OTEL_EXPORTER_OTLP_ENDPOINT=http://otelcol:4317
       - RUST_LOG=info,fulfilment_api=info,shipyard_web=info,tower_http=warn
+      - DATABASE_URL=postgres://shipyard:shipyard@postgres:5432/shipyard
     ports:
       - "8080:8080"
     depends_on:
       - otelcol
+      - postgres
     networks:
       - shipyard
+
+  postgres:
+    image: postgres:16
+    profiles: [ "db" ]
+    container_name: postgres
+    environment:
+      - POSTGRES_USER=shipyard
+      - POSTGRES_PASSWORD=shipyard
+      - POSTGRES_DB=shipyard
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U shipyard -d shipyard" ]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    networks:
+      - shipyard
+
   jaeger:
     image: jaegertracing/all-in-one:1.57
     container_name: jaeger
@@ -51,3 +74,6 @@ services:
 networks:
   shipyard:
     name: shipyard
+
+volumes:
+  postgres_data:
