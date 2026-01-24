@@ -68,6 +68,16 @@ impl ApiError {
         }
     }
 
+    pub fn conflict(req_id: &RequestId, message: impl Into<String>) -> Self {
+        Self {
+            status: StatusCode::CONFLICT,
+            code: "CONFLICT",
+            message: message.into(),
+            request_id: req_id.0.clone(),
+            details: None,
+        }
+    }
+
     pub fn with_details(mut self, details: Value) -> Self {
         self.details = Some(details);
         self
