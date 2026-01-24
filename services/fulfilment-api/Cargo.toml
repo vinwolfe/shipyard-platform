@@ -24,6 +24,11 @@ tracing = "0.1"
 once_cell = "1"
 prometheus-client = "0.22"
 
+# DB
+sqlx = { version = "0.8", default-features = false, features = ["runtime-tokio", "postgres", "macros", "migrate", "uuid"] }
+
 [dev-dependencies]
 tower = "0.5"
 http-body-util = "0.1"
+serde_json = "1"
+uuid = { version = "1", features = ["v4"] }
