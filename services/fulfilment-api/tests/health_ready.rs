@@ -1,5 +1,4 @@
 mod common;
-
 use axum::http::StatusCode;
 
 #[tokio::test]
@@ -9,7 +8,7 @@ async fn healthz_returns_200() {
 }
 
 #[tokio::test]
-async fn readyz_returns_200() {
+async fn readyz_returns_503_without_db() {
     let res = common::send("GET", "/readyz").await;
-    assert_eq!(res.status(), StatusCode::OK);
+    assert_eq!(res.status(), StatusCode::SERVICE_UNAVAILABLE);
 }

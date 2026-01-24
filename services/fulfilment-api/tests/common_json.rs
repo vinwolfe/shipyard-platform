@@ -4,7 +4,7 @@ use serde_json::Value;
 use tower::ServiceExt;
 
 fn app() -> Router {
-    fulfilment_api::build_app(shipyard_config::AppConfig::dev())
+    fulfilment_api::build_app_without_db(shipyard_config::AppConfig::dev())
 }
 
 pub async fn send_json(method: &str, uri: &str, body: &str) -> Response {
