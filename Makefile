@@ -8,7 +8,7 @@ SERVICE_BIN ?= fulfilment-api
 SERVICE_PORT ?= 8080
 
 COMPOSE_DIR := ops/compose
-COMPOSE_FILE := $(COMPOSE_DIR)/docker-compose.yml
+COMPOSE_FILE := $(COMPOSE_DIR)/docker-compose.yml 
 COMPOSE := docker compose -f $(COMPOSE_FILE)
 
 DB_SVC ?= postgres
@@ -116,23 +116,25 @@ logs-service:
 .PHONY: dev-db-up dev-db-wait dev-db-down db-logs migrate test-db
 
 dev-db-up:
-	$(COMPOSE) --profile db up -d $(DB_SVC)
+	$(COMPOSE)  up -d $(DB_SVC)
+	@$(MAKE) dev-db-wait
+	@$(MAKE) migrate
 
 dev-db-wait:
 	@echo "Waiting for Postgres healthcheck..."
-	@cid="$$( $(COMPOSE) --profile db ps -q $(DB_SVC) )"; \
+	@cid="$$( $(COMPOSE)  ps -q $(DB_SVC) )"; \
 	until [ "$$(docker inspect -f '{{.State.Health.Status}}' $$cid 2>/dev/null)" = "healthy" ]; do \
 		sleep 1; \
 	done; \
 	echo "Postgres is healthy."
 
 dev-db-down:
-	$(COMPOSE) --profile db rm -sf $(DB_SVC) >/dev/null || true
+	$(COMPOSE) down -v --remove-orphans >/dev/null 2>&1 || true
 
 db-logs:
-	$(COMPOSE) --profile db logs -f --tail=$(LOG_TAIL) $(DB_SVC)
+	$(COMPOSE)  logs -f --tail=$(LOG_TAIL) $(DB_SVC)
 
-migrate: dev-db-up dev-db-wait
+migrate:
 	@bash -lc '$(LOAD_ENV) \
 		DATABASE_URL=$${DATABASE_URL:-$(DATABASE_URL)} \
 		cargo run -p $(SERVICE) --bin migrate'
@@ -140,7 +142,6 @@ migrate: dev-db-up dev-db-wait
 test-db:
 	@set -e; \
 	$(MAKE) dev-db-up; \
-	$(MAKE) dev-db-wait; \
 	trap '$(MAKE) dev-db-down' EXIT; \
 	bash -lc '$(LOAD_ENV) \
 		DATABASE_URL=$${DATABASE_URL:-$(DATABASE_URL)} \
