@@ -26,6 +26,7 @@ pub async fn app() -> Router {
     fulfilment_api::build_app(config, db)
 }
 
+#[allow(dead_code)]
 pub async fn send(app: Router, method: &str, uri: &str) -> Response {
     app.oneshot(
         Request::builder()
@@ -49,6 +50,28 @@ pub async fn send_json(app: Router, method: &str, uri: &str, body: &str) -> Resp
     )
     .await
     .unwrap()
+}
+
+#[allow(dead_code)]
+pub async fn send_json_with_headers(
+    app: Router,
+    method: &str,
+    uri: &str,
+    body: &str,
+    headers: &[(&str, &str)],
+) -> Response {
+    let mut builder = Request::builder()
+        .method(method)
+        .uri(uri)
+        .header("content-type", "application/json");
+
+    for (k, v) in headers {
+        builder = builder.header(*k, *v);
+    }
+
+    app.oneshot(builder.body(Body::from(body.to_string())).unwrap())
+        .await
+        .unwrap()
 }
 
 pub async fn body_json(res: Response) -> Value {
