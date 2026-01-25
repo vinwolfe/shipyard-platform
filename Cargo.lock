@@ -446,11 +446,13 @@ name = "fulfilment-api"
 version = "0.1.0"
 dependencies = [
  "axum 0.7.9",
+ "hex",
  "http-body-util",
  "once_cell",
  "prometheus-client",
  "serde",
  "serde_json",
+ "sha2",
  "shipyard-config",
  "shipyard-observability",
  "shipyard-web",

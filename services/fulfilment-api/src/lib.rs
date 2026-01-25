@@ -7,6 +7,7 @@ use axum::Router;
 use shipyard_config::AppConfig;
 
 pub mod http;
+pub mod idempotency;
 pub mod metrics;
 
 #[derive(Clone)]
