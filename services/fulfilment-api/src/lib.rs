@@ -9,6 +9,7 @@ use shipyard_config::AppConfig;
 pub mod http;
 pub mod idempotency;
 pub mod metrics;
+pub mod outbox;
 
 #[derive(Clone)]
 pub struct AppState {
