@@ -10,7 +10,7 @@ WORKDIR /app
 COPY . .
 
 # Build real binary
-RUN cargo build -p fulfilment-api --release
+RUN cargo build --release -p fulfilment-api --bin fulfilment-api --bin outbox_worker
 
 # --- Runtime stage ---
 FROM debian:bookworm-slim
@@ -20,6 +20,7 @@ WORKDIR /app
 RUN apt-get update && apt-get install -y ca-certificates && rm -rf /var/lib/apt/lists/*
 
 COPY --from=builder /app/target/release/fulfilment-api /usr/local/bin/fulfilment-api
+COPY --from=builder /app/target/release/outbox_worker /usr/local/bin/outbox_worker
 
 ENV SERVICE_PORT=8080
 EXPOSE 8080

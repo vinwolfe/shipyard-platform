@@ -13,11 +13,28 @@ services:
     ports:
       - "8080:8080"
     depends_on:
-      - otelcol
-      - postgres
+      otelcol:
+        condition: service_started
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
     networks:
       - shipyard
 
+  fulfilment-outbox-worker:
+    build:
+      context: ../..
+      dockerfile: services/fulfilment-api/Dockerfile
+    command: [ "outbox_worker" ]
+    environment:
+      - DATABASE_URL=postgres://shipyard:shipyard@postgres:5432/shipyard
+      - RUST_LOG=info,fulfilment_api=info,shipyard_web=info
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - shipyard
   postgres:
     image: postgres:16
     container_name: postgres
@@ -29,6 +46,7 @@ services:
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
+    restart: unless-stopped
     healthcheck:
       test: [ "CMD-SHELL", "pg_isready -U shipyard -d shipyard" ]
       interval: 5s

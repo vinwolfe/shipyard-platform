@@ -45,7 +45,7 @@ help:
 	@echo "  make down          - stop runtime stack"
 	@echo "  make restart       - restart runtime stack"
 	@echo "  make logs          - tail all runtime logs"
-	@echo "  make logs-service  - tail one service logs (SVC=jaeger|otelcol|prometheus|fulfilment-api)"
+	@echo "  make logs-service  - tail one service logs (SVC=jaeger|otelcol|prometheus|fulfilment-api|fulfilment-outbox-worker)"
 	@echo ""
 	@echo "DB (workflow):"
 	@echo "  make dev-db-up     - start Postgres only (compose profile db)"
@@ -89,17 +89,20 @@ smoke:
 	@SERVICE_PORT=$(SERVICE_PORT) scripts/smoke.sh
 
 env-check:
-	@bash -lc '$(LOAD_ENV) env | grep -E "^DATABASE_URL$|^SERVICE_PORT$"'
+	@bash -lc "$(LOAD_ENV) env | grep -E '^(DATABASE_URL|SERVICE_PORT)='"
 
 # =========================
 # Runtime (docker compose)
 # =========================
 .PHONY: up down restart logs logs-service
 up:
-	$(COMPOSE) up -d --build
+	$(COMPOSE) up -d $(DB_SVC) otelcol jaeger prometheus
+	@$(MAKE) dev-db-wait
+	@$(MAKE) migrate
+	$(COMPOSE) up -d --build fulfilment-api fulfilment-outbox-worker
 
 down:
-	$(COMPOSE) down
+	$(COMPOSE) down -v
 
 restart: down up
 
@@ -116,7 +119,7 @@ logs-service:
 .PHONY: dev-db-up dev-db-wait dev-db-down db-logs migrate test-db
 
 dev-db-up:
-	$(COMPOSE)  up -d $(DB_SVC)
+	$(COMPOSE) up -d $(DB_SVC)
 	@$(MAKE) dev-db-wait
 	@$(MAKE) migrate
 

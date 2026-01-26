@@ -9,6 +9,8 @@ BASE_URL="${BASE_URL:-http://localhost:${PORT}}"
 VALID_PAYLOAD='{"external_id":"ord_123","items":[{"sku":"ABC","qty":1}]}'
 INVALID_PAYLOAD='{"external_id":"","items":[]}'
 CONTENT_TYPE_JSON="application/json"
+CREATE_PAYLOAD='{"external_id":"ord_smoke_outbox_1","items":[{"sku":"ABC","qty":1}]}'
+IDEMPOTENCY_KEY="smoke-key-ord-smoke-outbox-1"
 
 #--------- Colours ---------
 if [[ -t 1 ]]; then
@@ -94,6 +96,39 @@ hit_post_json() {
   echo
 }
 
+hit_post_json_with_headers() {
+  local name="$1"
+  local path="$2"
+  local payload="$3"
+  local extra_header_name="$4"
+  local extra_header_value="$5"
+  local lines="${6:-25}"
+  local fail_on_http="${7:-true}"
+  local expect_class="${8:-2}"
+
+  print_section "${name}"
+
+  local out
+  if [[ "${fail_on_http}" == "true" ]]; then
+    out="$(curl -fsS -i -X POST "${BASE_URL}${path}" \
+      -H "Content-Type: ${CONTENT_TYPE_JSON}" \
+      -H "${extra_header_name}: ${extra_header_value}" \
+      -d "${payload}")"
+  else
+    out="$(curl -sS -i -X POST "${BASE_URL}${path}" \
+      -H "Content-Type: ${CONTENT_TYPE_JSON}" \
+      -H "${extra_header_name}: ${extra_header_value}" \
+      -d "${payload}")"
+  fi
+
+  assert_status_prefix "$out" "HTTP/.* ${expect_class}"
+  assert_header_present "$out" "x-request-id"
+
+  echo "$out" | sed -n "1,${lines}p"
+  echo
+  echo
+}
+
 assert_header_present() {
   local headers="$1"
   local header_name="$2"
@@ -144,5 +179,25 @@ hit_post_json "POST /api/v1/orders/validate (invalid payload)" \
   25 \
   false \
   4
+
+# --- Create order (DB + idempotency + outbox intent) ---
+hit_post_json_with_headers "POST /api/v1/orders (create order)" \
+  "/api/v1/orders" \
+  "${CREATE_PAYLOAD}" \
+  "Idempotency-Key" \
+  "${IDEMPOTENCY_KEY}" \
+  40 \
+  true \
+  2
+
+# Retry same request with same idempotency key (should be safe + deterministic)
+hit_post_json_with_headers "POST /api/v1/orders (retry same idempotency key)" \
+  "/api/v1/orders" \
+  "${CREATE_PAYLOAD}" \
+  "Idempotency-Key" \
+  "${IDEMPOTENCY_KEY}" \
+  40 \
+  true \
+  2
 
 echo "${GREEN}✅ Smoke tests completed"

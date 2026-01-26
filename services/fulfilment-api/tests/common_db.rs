@@ -1,8 +1,28 @@
 use axum::{Router, body::Body, http::Request, response::Response};
 use http_body_util::BodyExt;
 use serde_json::Value;
-use sqlx::postgres::PgPoolOptions;
+use sqlx::{PgPool, postgres::PgPoolOptions};
 use tower::ServiceExt;
+
+#[allow(dead_code)]
+pub async fn db() -> PgPool {
+    let database_url = std::env::var("DATABASE_URL")
+        .expect("DATABASE_URL must be set for db tests (run via make test-db)");
+
+    let db = PgPoolOptions::new()
+        .max_connections(5)
+        .connect(&database_url)
+        .await
+        .expect("failed to connect to Postgres");
+
+    // Ensure schema exists for tests (safe & repeatable)
+    sqlx::migrate!("./migrations")
+        .run(&db)
+        .await
+        .expect("failed to run migrations");
+
+    db
+}
 
 pub async fn app() -> Router {
     // Config (dev) + DB URL (tests must provide this; see make test-db)
