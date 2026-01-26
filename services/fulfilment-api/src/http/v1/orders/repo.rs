@@ -1,8 +1,10 @@
-// services/fulfilment-api/src/http/v1/orders/repo.rs
-use shipyard_web::{ApiError, RequestId};
+use axum::http::StatusCode;
+use serde_json::json;
 use sqlx::{FromRow, PgPool, Postgres, Transaction};
 
-use axum::http::StatusCode;
+use shipyard_web::{ApiError, RequestId};
+
+use crate::outbox::types::OutboxEvent;
 
 use super::types::CreateOrderResponse;
 
@@ -15,7 +17,7 @@ pub(crate) struct OrderRow {
 }
 
 /// Create an order inside an existing transaction.
-/// This is intentionally “repo-shaped”: SQL strings live here, not in handlers.
+/// This is intentionally “repo-shaped”, handler stay thin
 pub async fn create_order_tx(
     tx: &mut Transaction<'_, Postgres>,
     req_id: &RequestId,
@@ -40,15 +42,34 @@ pub async fn create_order_tx(
     .await
     .map_err(|e| map_db_error(req_id, e))?;
 
-    Ok((
-        StatusCode::CREATED,
-        CreateOrderResponse {
-            id: row.id.to_string(),
-            external_id: row.external_id,
-            item_count: row.item_count,
-            total_qty: row.total_qty,
-        },
-    ))
+    // Build response from persisted row.
+    let resp = CreateOrderResponse {
+        id: row.id.to_string(),
+        external_id: row.external_id.clone(),
+        item_count: row.item_count,
+        total_qty: row.total_qty,
+    };
+
+    // Transactional outbox write in the SAME tx.
+    let event = OutboxEvent {
+        id: sqlx::types::Uuid::new_v4(),
+        event_type: "order.created".to_string(),
+        payload: json!({
+            "order_id": row.id.to_string(),
+            "external_id": row.external_id,
+            "item_count": row.item_count,
+            "total_qty": row.total_qty,
+        }),
+    };
+
+    crate::outbox::repo::enqueue(tx, &event)
+        .await
+        .map_err(|e| {
+            tracing::error!(error = %e, "outbox.enqueue_failed");
+            map_db_error(req_id, e)
+        })?;
+
+    Ok((StatusCode::CREATED, resp))
 }
 
 /// Fetch an order by id (UUID string).
@@ -76,14 +97,12 @@ pub async fn get_order_by_id_tx(
 }
 
 fn map_db_error(req_id: &RequestId, err: sqlx::Error) -> ApiError {
-    // Log for operators (don’t leak details to clients).
     tracing::error!(error = %err, "db error");
 
-    if let sqlx::Error::Database(db_err) = &err {
-        // Postgres unique_violation
-        if db_err.code().as_deref() == Some("23505") {
-            return ApiError::conflict(req_id, "external_id already exists");
-        }
+    if let sqlx::Error::Database(db_err) = &err
+        && db_err.code().as_deref() == Some("23505")
+    {
+        return ApiError::conflict(req_id, "external_id already exists");
     }
 
     ApiError::internal(req_id)
